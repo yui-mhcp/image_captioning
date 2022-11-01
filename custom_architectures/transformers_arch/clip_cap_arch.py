@@ -77,7 +77,7 @@ class ClipCapTransformerMapper(TransformerEncoder):
 
         if self.prefix_drop is not None: prefix = self.prefix_drop(prefix, training = training)
         
-        return super().call(prefix, ** kwargs)[0][:, self.prefix_length :]
+        return super().call(prefix, return_attention = False, ** kwargs)[:, self.prefix_length :]
 
     def transfer_weights(self, pretrained, tqdm = lambda x: x, ** kwargs):
         from models.weights_converter import _transformer_patterns, _attn_split, name_based_partial_transfer_learning
@@ -186,27 +186,9 @@ class ClipCap(tf.keras.Model):
         else:
             tokens = inputs
         
-        tokens = tokens[:, 1:]
-        
-        embeddings = prefix
-        if tf.shape(tokens)[1] > 0:
-            embedded_text   = self.generator.embed_tokens(tokens)
-            embeddings      = tf.concat([prefix, embedded_text], axis = 1)
-        if input_length is not None:
-            input_length    = input_length + tf.shape(prefix)[1] - 1
-        
-        outputs = self.generator(
-            embeddings, input_length = input_length, training = training, ** kwargs
+        return self.generator(
+            tokens, input_length = input_length, prefix = prefix, training = training, ** kwargs
         )
-        if not isinstance(outputs, (list, tuple, TransformerOutput)): outputs = (outputs, )
-        output  = outputs[0]
-        output  = output[:, self.prefix_length - 1 :]
-        
-        if isinstance(outputs, TransformerOutput):
-            return TransformerOutput(output, * outputs[1:])
-        elif len(outputs) > 1:
-            return (output, ) + outputs[1:]
-        return output
 
     @timer
     def infer(self, embedding = None, prefix = None, training = False, ** kwargs):
@@ -214,20 +196,7 @@ class ClipCap(tf.keras.Model):
             assert embedding is not None
             prefix  = self.mapper(embedding, training = training)
         
-        batch_size = tf.shape(prefix)[0]
-        if kwargs.get('method', None) == 'beam':
-            prefix = tf.repeat(prefix, kwargs.get('num_beams', 10), axis = 0)
-        
-        return infer(
-            self,
-            prefix  = prefix,
-            vocab_size  = self.vocab_size,
-            sos_token   = self.sos_token,
-            eos_token   = self.eos_token,
-            batch_size  = batch_size,
-            training    = training,
-            ** kwargs
-        )
+        return self.generator.infer(prefix = prefix, ** kwargs)
 
     def get_output_shape(self, * args, ** kwargs):
         return self.generator.get_output_shape(* args, ** kwargs)
