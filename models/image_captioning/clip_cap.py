@@ -156,7 +156,7 @@ class ClipCap(BaseTextModel, BaseEmbeddingModel):
             embeddings = tf.stack(inputs) if isinstance(inputs, list) else inputs
             if len(tf.shape(embeddings)) == 1: embeddings = tf.expand_dims(embeddings, axis = 0)
             elif len(tf.shape(embeddings)) == 3: embeddings = tf.squeeze(embeddings, axis = 1)
-            outputs = self.infer(embeddings)
+            outputs = self.infer(embeddings, ** {** kwargs, ** kw})
             
             if isinstance(inputs, list):
                 return [
