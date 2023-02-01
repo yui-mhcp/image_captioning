@@ -47,7 +47,8 @@ class ClipCap(BaseTextModel, BaseEmbeddingModel):
         super().__init__(pretrained = pretrained, ** kwargs)
         
         if hasattr(self.model, '_build'): self.model._build()
-    
+        if hasattr(self.model, 'set_tokens'): self.model.set_tokens(** self.model_tokens)
+
     def _build_model(self, pretrained = None, ** kwargs):
         if pretrained:
             super()._build_model(
@@ -67,7 +68,7 @@ class ClipCap(BaseTextModel, BaseEmbeddingModel):
     
     @property
     def input_signature(self):
-        return (self.embedding_signature, ) + self.text_signature
+        return (self.embedding_signature, self.text_signature)
     
     @property
     def output_signature(self):
@@ -107,32 +108,25 @@ class ClipCap(BaseTextModel, BaseEmbeddingModel):
         return self.get_embedding(data, ** kwargs)
     
     def get_output(self, data, ** kwargs):
-        tokens = self.tf_encode_text(data)
-        return (tokens, len(tokens))
+        return self.tf_encode_text(data)
     
     def encode_data(self, data):
         embedding   = self.get_input(data)
 
-        output      = self.tf_encode_text(data)
+        tokens      = self.tf_encode_text(data)
         
-        return (embedding, ) + output, output
+        return (embedding, tokens[:-1]), tokens[1:]
         
     def filter_data(self, inputs, outputs):
-        return outputs[-1] <= self.max_output_length
+        return tf.shape(outputs)[-1] <= self.max_output_length
     
     def augment_data(self, inputs, outputs):
-        embedding, text, text_length = inputs
+        embedding, tokens = inputs
         
         embedding   = self.maybe_augment_embedding(embedding)
-        text, text_length   = self.augment_text(text, text_length)
+        tokens      = self.augment_text(tokens)
         
-        return (embedding, text, text_length), outputs
-    
-    def preprocess_data(self, inputs, outputs):
-        embedding, text_in, text_in_len = inputs
-        text_out, text_out_len  = outputs
-        
-        return (embedding, text_in[:-1], text_in_len - 1), (text_out[1:], text_out_len - 1)
+        return (embedding, tokens), outputs
     
     def embed(self, data, * args, ** kwargs):
         return self.encoder.embed_image(data, * args, ** kwargs)
@@ -143,7 +137,7 @@ class ClipCap(BaseTextModel, BaseEmbeddingModel):
             'padded_batch'  : True,
             'pad_kwargs'    : {
                 'padding_values'    : (
-                    0., self.blank_token_idx, 0
+                    (0., self.blank_token_idx), self.blank_token_idx
                 )
             }
         })

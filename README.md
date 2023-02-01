@@ -1,8 +1,10 @@
-# :yum: Text To Speech (TTS)
+# :yum: Image captioning
 
 This project is still experimental and models have not been fine-tuned yet : in theory it should work but it has not been tested yet. Furthermore, due to weights convertion (from pytorch to tensorflow), performances may be slightly degraded\*. It is the reason why I will try to fine-tune a bit the models in the next updates. 
 
 \* I have tested the convertion by comparing outputs and the difference is really small (less than 0.001 at most) but even this small difference can make the generation different. 
+
+**NEW : [CHANGELOG](https://github.com/yui-mhcp/yui-mhcp/blob/main/CHANGELOG.md) file ! Check it to have a global overview of the latest modifications !** :yum:
 
 ## Project structure
 

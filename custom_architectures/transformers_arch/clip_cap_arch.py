@@ -14,14 +14,13 @@
 import os
 import json
 import logging
-import numpy as np
 import tensorflow as tf
 
 from tensorflow.keras.models import model_from_json
 
 from loggers import timer
 from custom_architectures.transformers_arch.generation_utils import infer
-from custom_architectures.transformers_arch.transformer_arch import HParamsTransformerEncoder, TransformerEncoder, TransformerOutput
+from custom_architectures.transformers_arch.transformer_arch import HParamsTransformerEncoder, TransformerEncoder
 
 logger  = logging.getLogger(__name__)
 
@@ -36,18 +35,19 @@ HParamsClipCapTransformerMapper = HParamsTransformerEncoder(
     prefix_length   = 40,
     prefix_drop_rate    = 0.1,
     
-    mha_num_heads   = 8,
+    normalize   = 'middle',
     mha_normalize   = False,
     mha_normalize_input = True,
-    normalize   = 'middle',
-    ffn_activation  = 'relu',
+    mha_num_heads   = 8,
     mha_epsilon     = 1e-5,
-    epsilon     = 1e-5
+    epsilon     = 1e-5,
+
+    ffn_activation  = 'relu'
 )
 
 class ClipCapTransformerMapper(TransformerEncoder):
     default_params  = HParamsClipCapTransformerMapper
-    _attr_to_set    = TransformerEncoder._attr_to_set + ['prefix_length', 'clip_dim']
+    _attr_to_set    = TransformerEncoder._attr_to_set + ['clip_dim', 'prefix_length']
     
     def __init__(self, clip_dim, name = 'mapper', ** kwargs):
         super().__init__(clip_dim = clip_dim, name = name, ** kwargs)
@@ -66,28 +66,31 @@ class ClipCapTransformerMapper(TransformerEncoder):
         ) if self.hparams.prefix_drop_rate > 0 else None
     
     @property
-    def dummy_inputs(self):
-        return tf.random.normal((2, self.hparams.clip_dim))
+    def input_signature(self):
+        return tf.TensorSpec(shape = (None, self.clip_dim), dtype = tf.float32)
 
-    @timer(name = 'Mapper call')
-    def call(self, inputs, training = False, ** kwargs):
-        inputs = tf.reshape(self.prefix_layer(inputs), [tf.shape(inputs)[0], self.prefix_length, -1])
+    def prepare_input(self, inputs, training = False, ** kwargs):
+        inputs = tf.reshape(
+            self.prefix_layer(inputs), [tf.shape(inputs)[0], self.prefix_length, self.embedding_dim]
+        )
         prefix = tf.tile(tf.expand_dims(self.prefix_count, axis = 0), [tf.shape(inputs)[0], 1, 1])
         prefix = tf.concat([inputs, prefix], axis = 1)
 
         if self.prefix_drop is not None: prefix = self.prefix_drop(prefix, training = training)
         
-        return super().call(prefix, return_attention = False, ** kwargs)[:, self.prefix_length :]
+        prefix._keras_mask = tf.fill((tf.shape(prefix)[0], tf.shape(prefix)[1]), True)
+        return prefix
 
-    def transfer_weights(self, pretrained, tqdm = lambda x: x, ** kwargs):
-        from models.weights_converter import _transformer_patterns, _attn_split, name_based_partial_transfer_learning
+    def compute_output(self, output, ** kwargs):
+        return super().compute_output(output, ** kwargs)[:, self.prefix_length :]
+    
+    def transfer_weights(self, pretrained, ** kwargs):
+        from models.weights_converter import _attn_split
 
-        state_dict = pretrained if isinstance(pretrained, dict) else pretrained.state_dict()
-
-        return name_based_partial_transfer_learning(
-            self, {k : v for k, v in state_dict.items() if k.startswith('clip')},
-            patterns = _transformer_patterns, tqdm = tqdm, transforms = _attn_split
-        )
+        if not isinstance(pretrained, dict): pretrained = pretrained.state_dict()
+        pretrained = {k : v for k, v in pretrained.items() if k.startswith('clip')}
+        
+        return super().transfer_weights(pretrained, transforms = _attn_split, ** kwargs)
 
     @classmethod
     def from_pretrained(cls, pretrained_name = 'transformer', pretrained = None,
@@ -115,6 +118,8 @@ class ClipCapTransformerMapper(TransformerEncoder):
         return instance
 
 class ClipCap(tf.keras.Model):
+    _attr_to_set = ['vocab_size', 'max_input_length', 'sos_token', 'eos_token', 'pad_token']
+    
     def __init__(self, mapper = 'transformer', generator = 'gpt2', name = 'ClipCap', ** kwargs):
         super().__init__(name = name)
         
@@ -137,7 +142,7 @@ class ClipCap(tf.keras.Model):
         self.mapper     = mapper
         self.generator  = generator
         
-        for key in ['max_input_length', 'return_state', 'return_attention', 'return_hidden_states', 'return_mask', 'sos_token', 'eos_token', 'sos_token', 'eos_token', 'vocab_size']:
+        for key in self._attr_to_set:
             setattr(self, key, self.generator.hparams[key])
     
     @property
@@ -155,11 +160,16 @@ class ClipCap(tf.keras.Model):
     @property
     def dummy_inputs(self):
         gen_inputs  = self.generator.dummy_inputs
+        if not isinstance(gen_inputs, list): gen_inputs = [gen_inputs]
+        
         batch_size  = tf.shape(gen_inputs[0])[0]
         return [tf.random.normal((batch_size, self.clip_dim))] + gen_inputs
 
-    def _build(self):
-        self(self.dummy_inputs, training = False)
+    def _build(self, ** kwargs):
+        return self(self.dummy_inputs, ** kwargs)
+    
+    def set_tokens(self, ** kwargs):
+        return self.generator.set_tokens(** kwargs)
     
     @timer(name = 'ClipCap call')
     def call(self,
@@ -168,11 +178,7 @@ class ClipCap(tf.keras.Model):
              input_length = None,
              prefix = None,
              
-             mask   = None,
-             training = False,
-             padding_mask   = None,
-             look_ahead_mask    = None,
-             
+             training   = False,
              ** kwargs
             ):
         if prefix is None:
@@ -225,16 +231,16 @@ class ClipCap(tf.keras.Model):
         return cls(** config)
 
     @classmethod
-    def from_pretrained(cls, pretrained_name = 'transformer', pretrained = None,
-                        tqdm = lambda x: x, ** kwargs):
+    def from_pretrained(cls, pretrained_name = 'transformer', pretrained = None, ** kwargs):
         from custom_architectures.transformers_arch import get_pretrained_transformer
         pretrained = load_clip_cap(pretrained_name, pretrained = pretrained)
         
         mapper  = ClipCapTransformerMapper.from_pretrained(
-            pretrained_name, pretrained = pretrained, tqdm = tqdm, name = 'mapper', ** kwargs
+            pretrained_name, pretrained = pretrained, name = 'mapper', ** kwargs
         )
         generator   = get_pretrained_transformer(
-            pretrained_name = 'gpt2', pretrained = pretrained, tqdm = tqdm, name = 'generator', ** kwargs
+            pretrained_name = 'gpt2', pretrained = pretrained, transpose = True,
+            name = 'generator', ** kwargs,
         )
         
         instance = cls(mapper = mapper, generator = generator, ** kwargs)
