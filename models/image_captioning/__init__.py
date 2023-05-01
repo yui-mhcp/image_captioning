@@ -12,6 +12,27 @@
 
 from models.image_captioning.clip_cap import ClipCap
 
+def get_model(model = None, lang = None):
+    assert model is not None or lang is not None
+    
+    global _pretrained
+    
+    if model is None:
+        if lang not in _pretrained: raise ValueError('No default model for language {}'.format(lang))
+        model = _pretrained[lang]
+
+    if isinstance(model, str):
+        from models import get_pretrained
+        
+        model = get_pretrained(model)
+    
+    return model
+
+def make_caption(image, model = None, lang = 'en', ** kwargs):
+    """ See `help(ClipCap.predict)` for more information """
+    model = get_model(model = model, lang = lang)
+    return model.predict(image, ** kwargs)
+
 _models = {
     'ClipCap'    : ClipCap
 }

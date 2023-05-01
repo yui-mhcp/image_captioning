@@ -1,8 +1,8 @@
 # :yum: Image captioning
 
-This project is still experimental and models have not been fine-tuned yet : in theory it should work but it has not been tested yet. Furthermore, due to weights convertion (from pytorch to tensorflow), performances may be slightly degraded\*. It is the reason why I will try to fine-tune a bit the models in the next updates. 
+This project is still experimental, and models have not been fine-tuned yet : it should work but it has not been tested yet. Furthermore, due to weights convertion (from pytorch to tensorflow), performances may be slightly degraded\*. It is the reason why I will try to fine-tune a bit the models in the next updates. 
 
-\* I have tested the convertion by comparing outputs and the difference is really small (less than 0.001 at most) but even this small difference can make the generation different. 
+\* The convertion has been tested by comparing outputs from both models. The difference is really small (less than 0.001), but even this small difference can make the generation differ. 
 
 **NEW : [CHANGELOG](https://github.com/yui-mhcp/yui-mhcp/blob/main/CHANGELOG.md) file ! Check it to have a global overview of the latest modifications !** :yum:
 
@@ -46,7 +46,7 @@ Available architectures :
 
 ### Model weights
 
-I do not have fine-tuned any model yet, so you can get pretrained weights [in the official project](https://github.com/rmokady/CLIP_prefix_caption) (currently, only the `transformer_weights` is supported). The [CLIP](https://openai.com/blog/clip/) encoders are automatically downloaded when executing the example's notebook.
+I do not have fine-tuned any model yet, so you can get pretrained weights [in the official project](https://github.com/rmokady/CLIP_prefix_caption) (currently, only the `transformer_weights` is supported). The [CLIP](https://openai.com/blog/clip/) encoders are automatically downloaded when executing the example's notebook (it requires `pytorch` installed).
 
 ## Usage and demonstration
 
@@ -69,13 +69,6 @@ You can find some illustration on [the official project](https://github.com/rmok
 - [ ] Implement ClipCap MLP mapper
 - [ ] Add pretrained weights for French
 - [ ] Fine-tune GPT-2 with Transformers mapper
-
-## Pipeline-based prediction
-
-The `ClipCap` model supports the pipeline-based prediction, meaning that all the tasks you see in the below graph are multi-threaded. Check the [data_processing project](https://github.com/yui-mhcp/data_processing) for a better understanding of the `producer-consumer` framework. 
-
-![Image captioning pipeline](captioning_pipeline.jpg)
-
 
 ## Contacts and licence
 
