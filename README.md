@@ -4,7 +4,7 @@ This project is still experimental, and models have not been fine-tuned yet : it
 
 \* The convertion has been tested by comparing outputs from both models. The difference is really small (less than 0.001), but even this small difference can make the generation differ. 
 
-**NEW : [CHANGELOG](https://github.com/yui-mhcp/yui-mhcp/blob/main/CHANGELOG.md) file ! Check it to have a global overview of the latest modifications !** :yum:
+Check the [CHANGELOG](https://github.com/yui-mhcp/yui-mhcp/blob/main/CHANGELOG.md) file to have a global overview of the latest modifications ! :yum:
 
 ## Project structure
 
@@ -103,5 +103,5 @@ Github projects :
 - [My SiameseNetwork project](https://github.com/yui-mhcp/siamese_networks) : more information about the CLIP architecture and how it works
 
 - Papers :
-- [ClipCap: CLIP Prefix for Image Captioning](https://arxiv.org/abs/2111.09734) : official ClipCap paper
-- [CLIP blog](https://openai.com/blog/clip/) : official OpenAI's blog post about CLIP
+- [1] [ClipCap: CLIP Prefix for Image Captioning](https://arxiv.org/abs/2111.09734) : official ClipCap paper
+- [2] [CLIP blog](https://openai.com/blog/clip/) : official OpenAI's blog post about CLIP
