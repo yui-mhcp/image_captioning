@@ -29,6 +29,11 @@ logger  = logging.getLogger(__name__)
 DEFAULT_MAX_TEXT_LENGTH = 150
 
 class ClipCap(BaseTextModel, BaseEmbeddingModel):
+    output_signature    = BaseTextModel.text_signature
+    
+    decode_output   = BaseTextModel.decode_text
+    get_output      = BaseTextModel.tf_encode_text
+    
     def __init__(self,
                  lang,
                  encoder_name   = 'clip_rn50x4',
@@ -73,10 +78,6 @@ class ClipCap(BaseTextModel, BaseEmbeddingModel):
     @property
     def input_signature(self):
         return (self.embedding_signature, self.text_signature)
-    
-    @property
-    def output_signature(self):
-        return self.text_signature
         
     @property
     def training_hparams(self):
@@ -95,9 +96,6 @@ class ClipCap(BaseTextModel, BaseEmbeddingModel):
         
         return self.model.infer(* args, ** kwargs)
     
-    def decode_output(self, output, ** kwargs):
-        return self.decode_text(output.tokens if hasattr(output, 'tokens') else output, ** kwargs)
-    
     def compile(self, loss = 'TextLoss', metrics = ['F1'], **kwargs):
         super().compile(loss = loss, metrics = metrics, ** kwargs)
     
@@ -110,9 +108,6 @@ class ClipCap(BaseTextModel, BaseEmbeddingModel):
     def get_input(self, data, ** kwargs):
         kwargs.setdefault('default_key', 'image_embedding')
         return self.get_embedding(data, ** kwargs)
-    
-    def get_output(self, data, ** kwargs):
-        return self.tf_encode_text(data)
     
     def encode_data(self, data):
         embedding   = self.get_input(data)
