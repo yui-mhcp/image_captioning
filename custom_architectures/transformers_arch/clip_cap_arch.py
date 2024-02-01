@@ -19,8 +19,10 @@ import tensorflow as tf
 from tensorflow.keras.models import model_from_json
 
 from loggers import timer
-from custom_architectures.transformers_arch.generation_utils import infer
-from custom_architectures.transformers_arch.transformer_arch import HParamsTransformerEncoder, TransformerEncoder
+from utils.tensorflow_utils import tf_compile
+from custom_architectures.transformers_arch.transformer_arch import (
+    HParamsTransformerEncoder, TransformerEncoder
+)
 
 logger  = logging.getLogger(__name__)
 
@@ -197,12 +199,20 @@ class ClipCap(tf.keras.Model):
         )
 
     @timer
-    def infer(self, embedding = None, prefix = None, training = False, ** kwargs):
+    @tf_compile(
+        reduce_retracing = True, support_xla = False, follow_type_hints = True, cast_kwargs = True
+    )
+    def infer(self,
+              embedding : tf.Tensor = None,
+              prefix    : tf.Tensor = None,
+              training  = False,
+              ** kwargs
+             ):
         if prefix is None:
             assert embedding is not None
             prefix  = self.mapper(embedding, training = training)
         
-        return self.generator.infer(prefix = prefix, ** kwargs)
+        return self.generator.infer(prefix = prefix, training = training, ** kwargs)
 
     def get_output_shape(self, * args, ** kwargs):
         return self.generator.get_output_shape(* args, ** kwargs)
